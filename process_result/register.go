@@ -12,14 +12,24 @@ import (
 )
 
 type info struct {
-	elasticInfo *elastic_helper.ElasticInfo
-	webexInfo   *webex_helper.WebexInfo
+	elasticInfo *ElasticInfo
+	webexInfo   *WebexInfo
 	runID       int64
 }
 
+type WebexInfo struct {
+	AuthToken string // webex auth token
+	Room      string // webex room
+}
+
+type ElasticInfo struct {
+	URL   string // elastic DB URL
+	Index string // elastic DB Index
+}
+
 func Register(ctx context.Context, runID int64,
-	elasticInfo *elastic_helper.ElasticInfo,
-	webexInfo *webex_helper.WebexInfo,
+	elasticInfo *ElasticInfo,
+	webexInfo *WebexInfo,
 ) error {
 	c := &info{}
 
@@ -29,23 +39,23 @@ func Register(ctx context.Context, runID int64,
 	c.runID = runID
 
 	if elasticInfo != nil {
-		if err := elastic_helper.VerifyInfo(ctx, elasticInfo); err != nil {
+		c.elasticInfo = elasticInfo
+		if err := elastic_helper.VerifyInfo(ctx, c.getElasticInfo()); err != nil {
 			return fmt.Errorf("failed to verify elastic info. Error: %v", err)
 		}
-		c.elasticInfo = elasticInfo
 	}
 
 	if webexInfo != nil {
-		if err := webex_helper.VerifyInfo(webexInfo); err != nil {
+		c.webexInfo = webexInfo
+		if err := webex_helper.VerifyInfo(c.getWebexInfo()); err != nil {
 			return fmt.Errorf("failed to verify webex info. Error: %v", err)
 		}
-		c.webexInfo = webexInfo
 	}
 
 	afterSuiteReport := func(report ginkgoTypes.Report) {
 		if c.elasticInfo != nil {
 			By(fmt.Sprintf("Save results to elastic db. Run %d", runID))
-			elastic_helper.StoreResults(&report, c.runID, c.elasticInfo)
+			elastic_helper.StoreResults(&report, c.runID, c.getElasticInfo())
 		}
 
 		if c.webexInfo != nil {
@@ -69,5 +79,19 @@ func sendWebexNotification(report *ginkgoTypes.Report, c *info) {
 		}
 	}
 
-	webex_helper.SendWebexMessage(c.webexInfo, msg)
+	webex_helper.SendWebexMessage(c.getWebexInfo(), msg)
+}
+
+func (i *info) getWebexInfo() *webex_helper.WebexInfo {
+	return &webex_helper.WebexInfo{
+		AuthToken: i.webexInfo.AuthToken,
+		Room:      i.webexInfo.Room,
+	}
+}
+
+func (i *info) getElasticInfo() *elastic_helper.ElasticInfo {
+	return &elastic_helper.ElasticInfo{
+		URL:   i.elasticInfo.URL,
+		Index: i.elasticInfo.Index,
+	}
 }

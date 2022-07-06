@@ -6,15 +6,19 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2" // nolint: golint,stylecheck // ginkgo pattern
 	ginkgoTypes "github.com/onsi/ginkgo/v2/types"
 
+	"github.com/gdexlab/go-render/render"
 	elastic "github.com/olivere/elastic/v7"
+
+	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/ginkgo_helper"
+	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/utils"
 )
 
 type ElasticInfo struct {
-	URL   string // elastic DB URL
-	Index string // elastic DB Index
+	URL    string // elastic DB URL
+	Index  string // elastic DB Index
+	DryRun bool   // indicates if this is a dryRun
 }
 
 type ElasticResult struct {
@@ -56,19 +60,19 @@ func VerifyInfo(ctx context.Context, info *ElasticInfo) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to create client to access es: %v", err)
-		By(msg)
+		utils.Byf(msg)
 		return fmt.Errorf("%s", msg)
 	}
 
 	exist, err := client.IndexExists(info.Index).Do(ctx)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to check index %s existence err: %v", info.Index, err)
-		By(msg)
+		utils.Byf(msg)
 		return fmt.Errorf("%s", msg)
 	}
 	if !exist {
 		msg := fmt.Sprintf("Index %s does not exist", info.Index)
-		By(msg)
+		utils.Byf(msg)
 		return fmt.Errorf("%s", msg)
 	}
 
@@ -88,60 +92,26 @@ func StoreResults(report *ginkgoTypes.Report, runID int64, info *ElasticInfo) {
 		elastic.SetHealthcheckInterval(healthCheckInterval),
 	)
 	if err != nil {
-		By(fmt.Sprintf("Failed to create client to access es: %v", err))
+		utils.Byf(fmt.Sprintf("Failed to create client to access es: %v", err))
 		return
 	}
 
 	exist, err := client.IndexExists(info.Index).Do(ctx)
 	if err != nil {
-		By(fmt.Sprintf("Failed to check index %s existence err: %v", info.Index, err))
+		utils.Byf(fmt.Sprintf("Failed to check index %s existence err: %v", info.Index, err))
 		return
 	}
 	if !exist {
-		By(fmt.Sprintf("Index %s does not exist", info.Index))
+		utils.Byf(fmt.Sprintf("Index %s does not exist", info.Index))
 		return
 	}
 
-	By(fmt.Sprintf("Found %d tests", len(report.SpecReports)))
+	utils.Byf(fmt.Sprintf("Found %d tests", len(report.SpecReports)))
 
 	for i := range report.SpecReports {
 		testReport := report.SpecReports[i]
 
-		testName := getTestName(&testReport)
-
-		// E2E runs in parallel. GINKGO_NODES defines how many nodes.
-		// That means there are multiple SynchronizedAfterSuite and SynchronizedAfterSuite
-		// running, one per node. But only one SynchronizedBeforeSuite and one SynchronizedAfterSuite
-		// actually do work. Store result only for the first one
-		if testName == ginkgoTypes.NodeTypeSynchronizedBeforeSuite.String() ||
-			testName == ginkgoTypes.NodeTypeSynchronizedAfterSuite.String() {
-			if testReport.ParallelProcess != 1 {
-				continue
-			}
-		}
-
-		maintainer := getMaintainer(&testReport)
-
-		r := ElasticResult{
-			Name: testName,
-			// Description is what allows us to find from a query in es for a failed test, the corresponding Jira bug
-			Description:       getSummary(&testReport),
-			DurationInMinutes: testReport.RunTime.Minutes(),
-			DurationInSecond:  testReport.RunTime.Round(time.Second),
-			Run:               runID,
-			Maintainer:        maintainer,
-			StartTime:         testReport.StartTime,
-			Serial:            isTestSerial(&testReport),
-		}
-		r.Result = testReport.State.String()
-
-		runInfo := fmt.Sprintf("run_%d_test_%s", runID, strings.TrimSpace(testName))
-		_, err := client.Index().Index(info.Index).Id(runInfo).BodyJson(r).Do(context.TODO())
-		if err != nil {
-			By(fmt.Sprintf("Failed to store result %s. Result %s", testName, r.Result))
-		} else {
-			By(fmt.Sprintf("Stored result %s. Result %s", testName, r.Result))
-		}
+		storeResult(testReport, client, info.Index, runID, info.DryRun)
 	}
 }
 
@@ -154,7 +124,7 @@ func GetFailuresForRun(buildID int, buildEnvironment, esURL, index string) (*ela
 		elastic.SetHealthcheckInterval(healthCheckInterval),
 	)
 	if err != nil {
-		By(fmt.Sprintf("Failed to create client to access es: %v", err))
+		utils.Byf(fmt.Sprintf("Failed to create client to access es: %v", err))
 		return nil, err
 	}
 
@@ -169,75 +139,51 @@ func GetFailuresForRun(buildID int, buildEnvironment, esURL, index string) (*ela
 		Pretty(true).            // pretty print request and response JSON
 		Do(context.Background()) // execute
 	if err != nil {
-		By(fmt.Sprintf("Failed to run query %v", err))
+		utils.Byf(fmt.Sprintf("Failed to run query %v", err))
 		return nil, err
 	}
 
 	return searchResult, nil
 }
 
-// getTestName returns test name.
-// If label "name:<testName>" is set, <testName> will be used.
-// Otherwise LeafNodeText will be used, if not empty.
-// Otherise LeafNodeType will be used.
-func getTestName(testReport *ginkgoTypes.SpecReport) string {
-	const infoSize = 2
-	var testName string
-	for i := range testReport.LeafNodeLabels {
-		if strings.Contains(testReport.LeafNodeLabels[i], "name") {
-			info := strings.Split(testReport.LeafNodeLabels[i], ":")
-			if len(info) == infoSize {
-				testName = info[1]
-			}
+func storeResult(testReport ginkgoTypes.SpecReport, client *elastic.Client, index string,
+	runID int64, dryRun bool) {
+	testName, maintainer := ginkgo_helper.GetTestNameAndMaintainer(&testReport)
+
+	// E2E runs in parallel. GINKGO_NODES defines how many nodes.
+	// That means there are multiple SynchronizedAfterSuite and SynchronizedAfterSuite
+	// running, one per node. But only one SynchronizedBeforeSuite and one SynchronizedAfterSuite
+	// actually do work. Store result only for the first one
+	if testName == ginkgoTypes.NodeTypeSynchronizedBeforeSuite.String() ||
+		testName == ginkgoTypes.NodeTypeSynchronizedAfterSuite.String() {
+		if testReport.ParallelProcess != 1 {
+			return
 		}
 	}
 
-	if testName == "" {
-		if testReport.LeafNodeText != "" {
-			testName = strings.ReplaceAll(testReport.LeafNodeText, " ", "_")
-		} else {
-			testName = strings.ReplaceAll(testReport.LeafNodeType.String(), " ", "_")
-		}
+	r := ElasticResult{
+		Name: testName,
+		// Description is what allows us to find from a query in es for a failed test, the corresponding Jira bug
+		Description:       ginkgo_helper.GetSummary(&testReport),
+		DurationInMinutes: testReport.RunTime.Minutes(),
+		DurationInSecond:  testReport.RunTime.Round(time.Second),
+		Run:               runID,
+		Maintainer:        maintainer,
+		StartTime:         testReport.StartTime,
+		Serial:            ginkgo_helper.IsTestSerial(&testReport),
+	}
+	r.Result = testReport.State.String()
+
+	runInfo := fmt.Sprintf("run_%d_test_%s", runID, strings.TrimSpace(testName))
+	if dryRun {
+		utils.Byf("Run ID: %d Store ElasticResult %s", runID, render.AsCode(r))
+		return
 	}
 
-	return testName
-}
-
-// getMaintainer returns maintainer name if set.
-func getMaintainer(testReport *ginkgoTypes.SpecReport) string {
-	const infoSize = 2
-	var maintainer string
-	for i := range testReport.LeafNodeLabels {
-		if strings.Contains(testReport.LeafNodeLabels[i], "maintainer") {
-			info := strings.Split(testReport.LeafNodeLabels[i], ":")
-			if len(info) == infoSize {
-				maintainer = info[1]
-			}
-		}
-	}
-
-	return maintainer
-}
-
-// isTestSerial returns true if a test was run in serial.
-// NodeTypeSynchronizedBeforeSuite and NodeTypeSynchronizedAfterSuite have no labels
-// but run in serial
-func isTestSerial(testReport *ginkgoTypes.SpecReport) bool {
-	if testReport.LeafNodeType == ginkgoTypes.NodeTypeSynchronizedBeforeSuite ||
-		testReport.LeafNodeType == ginkgoTypes.NodeTypeSynchronizedAfterSuite {
-		return true
-	}
-	return testReport.IsSerial || testReport.IsInOrderedContainer
-}
-
-// getSummary returns, for a given test, the summary of the corresponding Jira bug (if one
-// were to be created)
-func getSummary(testReport *ginkgoTypes.SpecReport) string {
-	var summary string
-	if testReport.LeafNodeText != "" {
-		summary = testReport.LeafNodeText
+	_, err := client.Index().Index(index).Id(runInfo).BodyJson(r).Do(context.TODO())
+	if err != nil {
+		utils.Byf(fmt.Sprintf("Failed to store result %s. Result %s", testName, r.Result))
 	} else {
-		summary = testReport.LeafNodeType.String()
+		utils.Byf(fmt.Sprintf("Stored result %s. Result %s", testName, r.Result))
 	}
-	return summary
 }

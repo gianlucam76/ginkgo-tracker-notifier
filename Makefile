@@ -12,8 +12,13 @@ BIN_DIR := bin
 TOOLS_DIR := hack/tools
 TOOLS_BIN_DIR := $(TOOLS_DIR)/bin
 
+GOPROXY=devops-centos7-atom1.cisco.com/artifactory/proxy-go-remote
+GOPRIVATE=aci-github.cisco.com
+GOBUILD=GOPROXY=$(GOPROXY) GOPRIVATE=$(GOPRIVATE) go build
+
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 GOIMPORTS := $(TOOLS_BIN_DIR)/goimports
+GINKGO := $(TOOLS_BIN_DIR)/ginkgo
 
 TAG ?= dev
 ARCH ?= amd64
@@ -30,7 +35,13 @@ $(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod # Build golangci-lint from tools folder.
 
 $(GOIMPORTS):
 	cd $(TOOLS_DIR); go build -tags=tools -o $(subst hack/tools/,,$@) golang.org/x/tools/cmd/goimports
+
+$(GINKGO): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR) && $(GOBUILD) -tags tools -o $(subst hack/tools/,,$@) github.com/onsi/ginkgo/v2/ginkgo	
 	
+.PHONY: tools
+tools:  $(GOLANGCI_LINT) $(GOIMPORTS) $(GINKGO) ## build all tools
+
 ###############################################################################
 ## Help
 ###############################################################################
@@ -52,8 +63,16 @@ lint: $(GOLANGCI_LINT) ## Lint codebase
 
 .PHONY: fmt
 fmt goimports: $(GOIMPORTS) ## Format and adjust import modules.
-	$(GOIMPORTS) -local golang.cisco.com/cloudstack -w .
+	$(GOIMPORTS) -local github.com/gianlucam76 -w .
 
 .PHONY: vet
 vet: ## Run go vet against code
 	go vet ./...
+
+###############################################################################
+# Tests
+###############################################################################
+
+.PHONY: ut
+ut: $(GINKGO) ## Run uts
+	$(GINKGO) --v --trace --randomize-all -r --label-filter=${FOCUS} 

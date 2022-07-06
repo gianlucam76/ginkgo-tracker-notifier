@@ -3,14 +3,15 @@ package webex_helper
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo/v2" // nolint: golint,stylecheck // ginkgo pattern
-
 	webexteams "github.com/jbogarin/go-cisco-webex-teams/sdk"
+
+	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/utils"
 )
 
 type WebexInfo struct {
 	AuthToken string // webex auth token
 	Room      string // webex room
+	DryRun    bool   // indicates if this is a dryRun
 }
 
 // VerifyInfo verifies provided info (webex authorization token and room) are correct
@@ -40,7 +41,7 @@ func getRoom(c *webexteams.Client, roomName string) (*webexteams.Room, error) {
 	}
 	rooms, _, err := c.Rooms.ListRooms(roomQueryParams)
 	if err != nil {
-		By(fmt.Sprintf("Failed to list rooms %v", err))
+		utils.Byf(fmt.Sprintf("Failed to list rooms %v", err))
 		return nil, err
 	}
 
@@ -50,36 +51,42 @@ func getRoom(c *webexteams.Client, roomName string) (*webexteams.Room, error) {
 		}
 	}
 
-	By(fmt.Sprintf("Failed to find room %s", roomName))
+	utils.Byf(fmt.Sprintf("Failed to find room %s", roomName))
 	return nil, nil
 }
 
 // SendWebexMessage sends webex message to specified room.
 // text is a markdown message
 func SendWebexMessage(info *WebexInfo, text string) {
-	By(fmt.Sprintf("Get room %s", info.Room))
+	utils.Byf(fmt.Sprintf("Get room %s", info.Room))
 	c := getWebexClient(info.AuthToken)
 	room, err := getRoom(c, info.Room)
 	if err != nil {
-		By(fmt.Sprintf("failed to get room %s. Error: %v", info.Room, err))
+		utils.Byf(fmt.Sprintf("failed to get room %s. Error: %v", info.Room, err))
 		return
 	}
 	if room == nil {
-		By(fmt.Sprintf("failed to get room %s.", info.Room))
+		utils.Byf(fmt.Sprintf("failed to get room %s.", info.Room))
 		return
 	}
 
-	By(fmt.Sprintf("Sending message to room %s", info.Room))
+	utils.Byf(fmt.Sprintf("Sending message to room %s", info.Room))
 	message := &webexteams.MessageCreateRequest{
 		Markdown: text,
 		RoomID:   room.ID,
 	}
+
+	if info.DryRun {
+		utils.Byf("Send message %q to room %s", message.Markdown, room.Title)
+		return
+	}
+
 	_, resp, err := c.Messages.CreateMessage(message)
 	if err != nil {
 		if resp != nil {
-			By(fmt.Sprintf("Failed to send message. Error: %v. Response: %s", err, string(resp.Body())))
+			utils.Byf(fmt.Sprintf("Failed to send message. Error: %v. Response: %s", err, string(resp.Body())))
 			return
 		}
-		By(fmt.Sprintf("Failed to send message. Error: %v", err))
+		utils.Byf(fmt.Sprintf("Failed to send message. Error: %v", err))
 	}
 }

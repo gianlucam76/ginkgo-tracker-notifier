@@ -1,8 +1,8 @@
-If you are [Ginkgo](https://onsi.github.io/ginkgo), this package can be of help.
+If you are using [Ginkgo](https://onsi.github.io/ginkgo), this package can be of help.
 
 This package, registered from a ginkgo test suite, provides support for:
 1. Store test-suite results to an elastic DB;
-2. Send notification for failed tests in a test-suite to a webex channel;
+2. Send notification for failed tests in a test-suite to a webex channel/slack channel;
 3. File Jira issue for each failed tests in a test-suite.
 
 You can pick what you need (all or a just a subset of supported features).
@@ -48,6 +48,7 @@ func TestLib(t *testing.T) {
 		false,        // dryRun: if enables, this package will print all it would do:
 		              // - log what it would store to the provided elastic DB without storing anything;
   		              // - log what message it would send to the provided webex room, without sending any message;
+			      // - log what message it would send to the provided slack channel, without sending any message;
  		              // - log what Jira issues it would file, without filing any issue.
 		&elasticInfo, // elastic info: test results will be stored into an elastic DB;
 		&webexInfo,   // webex info: a webex message will be sent for failed tests in this suite;

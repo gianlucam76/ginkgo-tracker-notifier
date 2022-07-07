@@ -31,6 +31,11 @@ func TestLib(t *testing.T) {
 		AuthToken: "YOUR WEBEX AUTH TOKEN",
 		Room:      "YOUR WEBEX ROOM",
 	}
+
+	slackInfo := ginkgo_helper.SlackInfo{
+		AuthToken: "YOUR SLACK AUTH TOKEN",
+		Channel:   "YOUR SLACK CHANNEL",
+	}
   
  	elasticInfo := ginkgo_helper.ElasticInfo{
 		URL:        "YOUR ELASTIC URL",
@@ -46,6 +51,7 @@ func TestLib(t *testing.T) {
  		              // - log what Jira issues it would file, without filing any issue.
 		&elasticInfo, // elastic info: test results will be stored into an elastic DB;
 		&webexInfo,   // webex info: a webex message will be sent for failed tests in this suite;
+		&slackInfo,   // slack info: a slack message will be sent for failed tests in this suite;
 		nil,          // no jira. No Jira issue will be failed for failed tests in this suite;
 	)).To(Succeed())
 

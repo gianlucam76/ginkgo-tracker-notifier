@@ -12,6 +12,7 @@ import (
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/elastic_helper"
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/ginkgo_helper"
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/jira_helper"
+	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/slack_helper"
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/utils"
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/webex_helper"
 )
@@ -19,6 +20,7 @@ import (
 type info struct {
 	elasticInfo *ElasticInfo
 	webexInfo   *WebexInfo
+	slackInfo   *SlackInfo
 	jiraInfo    *JiraInfo
 	runID       int64
 	dryRun      bool
@@ -27,6 +29,11 @@ type info struct {
 type WebexInfo struct {
 	AuthToken string // webex auth token
 	Room      string // webex room
+}
+
+type SlackInfo struct {
+	AuthToken string // slack auth token
+	Channel   string // slack channel name
 }
 
 type ElasticInfo struct {
@@ -62,6 +69,7 @@ type JiraInfo struct {
 func Register(ctx context.Context, runID int64, enableLogs bool, dryRun bool,
 	elasticInfo *ElasticInfo,
 	webexInfo *WebexInfo,
+	slackInfo *SlackInfo,
 	jiraInfo *JiraInfo,
 ) error {
 	c := &info{}
@@ -90,6 +98,12 @@ func Register(ctx context.Context, runID int64, enableLogs bool, dryRun bool,
 		}
 	}
 
+	if slackInfo != nil {
+		if err := setSlackInfo(ctx, c, slackInfo); err != nil {
+			return err
+		}
+	}
+
 	if jiraInfo != nil {
 		if err := setJiraInfo(ctx, c, jiraInfo); err != nil {
 			return err
@@ -114,6 +128,11 @@ func Register(ctx context.Context, runID int64, enableLogs bool, dryRun bool,
 
 		if c.webexInfo != nil {
 			utils.Byf(fmt.Sprintf("Send failed tests notification to webex room %s", c.webexInfo.Room))
+			sendWebexNotification(&report, c, msg)
+		}
+
+		if c.slackInfo != nil {
+			utils.Byf(fmt.Sprintf("Send failed tests notification to slack channel %s", c.slackInfo.Channel))
 			sendWebexNotification(&report, c, msg)
 		}
 	}
@@ -157,6 +176,14 @@ func (i *info) getWebexInfo() *webex_helper.WebexInfo {
 	}
 }
 
+func (i *info) getSlackInfo() *slack_helper.SlackInfo {
+	return &slack_helper.SlackInfo{
+		AuthToken: i.slackInfo.AuthToken,
+		Channel:   i.slackInfo.Channel,
+		DryRun:    i.dryRun,
+	}
+}
+
 func (i *info) getElasticInfo() *elastic_helper.ElasticInfo {
 	return &elastic_helper.ElasticInfo{
 		URL:    i.elasticInfo.URL,
@@ -189,6 +216,14 @@ func setWebexInfo(ctx context.Context, c *info, webexInfo *WebexInfo) error {
 	c.webexInfo = webexInfo
 	if err := webex_helper.VerifyInfo(c.getWebexInfo()); err != nil {
 		return fmt.Errorf("failed to verify webex info. Error: %v", err)
+	}
+	return nil
+}
+
+func setSlackInfo(ctx context.Context, c *info, slackInfo *SlackInfo) error {
+	c.slackInfo = slackInfo
+	if err := slack_helper.VerifyInfo(ctx, c.getSlackInfo()); err != nil {
+		return fmt.Errorf("failed to verify slack info. Error: %v", err)
 	}
 	return nil
 }

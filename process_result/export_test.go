@@ -3,6 +3,7 @@ package process_result
 var (
 	SetElasticInfo = setElasticInfo
 	SetWebexInfo   = setWebexInfo
+	SetSlackInfo   = setSlackInfo
 	SetJiraInfo    = setJiraInfo
 
 	PrepareMessage = prepareMessage

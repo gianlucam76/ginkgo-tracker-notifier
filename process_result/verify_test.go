@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/utils"
@@ -22,6 +23,9 @@ const (
 	WEBEX_AUTH_TOKEN = "WEBEX_AUTH_TOKEN"
 	WEBEX_ROOM       = "WEBEX_ROOM"
 
+	SLACK_AUTH_TOKEN = "SLACK_AUTH_TOKEN"
+	SLACK_CHANNEL    = "SLACK_CHANNEL"
+
 	JIRA_BASE_URL = "JIRA_BASE_URL"
 	JIRA_PROJECT  = "JIRA_PROJECT"
 	JIRA_BOARD    = "JIRA_BOARD"
@@ -36,6 +40,9 @@ type utConfig struct {
 
 	// Webex contains webex configuration
 	Webex map[string]string `json:"webex,omitempty"`
+
+	// Slack contains slack configuration
+	Slack map[string]string `json:"slack,omitempty"`
 
 	// Elastic contains elastic configuration
 	Elastic map[string]string `json:"elastic,omitempty"`
@@ -81,6 +88,40 @@ var _ = Describe("Test verify methods", func() {
 
 		c := &process_result.Info{}
 		Expect(process_result.SetElasticInfo(context.TODO(), c, &elasticInfo)).ToNot(BeNil())
+	})
+
+	It("SetSlackInfo reports no error when correct info are provided", Label("SLACK"), func() {
+		Expect(config.Slack).ToNot(BeEmpty())
+		slackInfo := process_result.SlackInfo{
+			AuthToken: config.GetSlackVariable(SLACK_AUTH_TOKEN),
+			Channel:   config.GetSlackVariable(SLACK_CHANNEL),
+		}
+
+		c := &process_result.Info{}
+		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).To(BeNil())
+	})
+
+	It("SetSlackInfo reports error when wrong token is provided", Label("SLACK"), func() {
+		Expect(config.Slack).ToNot(BeEmpty())
+		slackAuthToken := "abc"
+		slackInfo := process_result.SlackInfo{
+			AuthToken: slackAuthToken,
+			Channel:   config.GetSlackVariable(SLACK_CHANNEL),
+		}
+
+		c := &process_result.Info{}
+		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).ToNot(BeNil())
+	})
+
+	It("SetSlackInfo reports error when wrong channel name is provided", Label("SLACK"), func() {
+		Expect(config.Slack).ToNot(BeEmpty())
+		slackInfo := process_result.SlackInfo{
+			AuthToken: config.GetSlackVariable(SLACK_AUTH_TOKEN),
+			Channel:   "non-existing",
+		}
+
+		c := &process_result.Info{}
+		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).ToNot(BeNil())
 	})
 
 	It("SetWebexInfo reports no error when correct info are provided", Label("WEBEX"), func() {
@@ -175,6 +216,13 @@ func (c *utConfig) GetElasticVariable(varName string) string {
 // GetWebexVariable returns a variable from the ut config file.
 func (c *utConfig) GetWebexVariable(varName string) string {
 	value, ok := c.Webex[varName]
+	Expect(ok).NotTo(BeFalse())
+	return value
+}
+
+// GetSlackVariable returns a variable from the ut config file.
+func (c *utConfig) GetSlackVariable(varName string) string {
+	value, ok := c.Slack[varName]
 	Expect(ok).NotTo(BeFalse())
 	return value
 }

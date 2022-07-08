@@ -71,6 +71,7 @@ Another option is to:
 
 1. prepare a config file containing the necessary info. Here is an example
 ```
+jira:
     JIRA_BASE_URL: "your jira base url"
     JIRA_PROJECT: "your jira project"
     JIRA_BOARD: "your jira board"

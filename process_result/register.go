@@ -17,13 +17,14 @@ import (
 	"github.com/gianlucam76/ginkgo-tracker-notifier/internal/webex_helper"
 )
 
-type info struct {
-	elasticInfo *ElasticInfo
-	webexInfo   *WebexInfo
-	slackInfo   *SlackInfo
-	jiraInfo    *JiraInfo
-	runID       int64
-	dryRun      bool
+type Options struct {
+	ElasticInfo *ElasticInfo
+	WebexInfo   *WebexInfo
+	SlackInfo   *SlackInfo
+	JiraInfo    *JiraInfo
+	RunID       int64
+	DryRun      bool
+	EnableLogs  bool
 }
 
 type WebexInfo struct {
@@ -52,87 +53,112 @@ type JiraInfo struct {
 	Password string // jira password
 }
 
+type Option func(*Options)
+
+func WithLogs() Option {
+	return func(args *Options) {
+		args.EnableLogs = true
+	}
+}
+
+func WithRunID(runID int64) Option {
+	return func(args *Options) {
+		args.RunID = runID
+	}
+}
+
+func WithDryRun() Option {
+	return func(args *Options) {
+		args.EnableLogs = true
+		args.DryRun = true
+	}
+}
+
+func WithElastic(info ElasticInfo) Option {
+	return func(args *Options) {
+		args.ElasticInfo = &info
+	}
+}
+
+func WithWebex(info WebexInfo) Option {
+	return func(args *Options) {
+		args.WebexInfo = &info
+	}
+}
+
+func WithSlack(info SlackInfo) Option {
+	return func(args *Options) {
+		args.SlackInfo = &info
+	}
+}
+
+func WithJira(info JiraInfo) Option {
+	return func(args *Options) {
+		args.JiraInfo = &info
+	}
+}
+
 // Register register ReportAfterSuite (named afterSuiteReport) when called.
-// Args:
-// - runID: is the CI/e2e run ID. This is used when storing result to elastic DB and/or when
-// filing jira issues;
-// - enableLogs: if set will allow some messages to logged. Otherwise no message is logged;
-// - dryRun: indicates whether this is a dry run. dryRun overrides enableLogs to true.
-//   In a dry run:
-// 		. no result will be stored in elastic DB (only a log containing the results will be displayed)
-//      . no message will be sent to webex room (only a log containing the message will be displayed)
-//		. no jira bug will be filed or comment added (only a log will be displayed for each jira bug that would have been created/modified)
-// - elasticInfo: if provided, test suite results will be stored to an elastic DB;
-// - webexInfo: if provided a webex message will be sent for each run with at least one failed test;
-// - jiraInfo: if provided, a jira bug will be filed, if one does not exist already, for each failed
-// test.
-func Register(ctx context.Context, runID int64, enableLogs bool, dryRun bool,
-	elasticInfo *ElasticInfo,
-	webexInfo *WebexInfo,
-	slackInfo *SlackInfo,
-	jiraInfo *JiraInfo,
-) error {
-	c := &info{}
+func Register(ctx context.Context, setters ...Option) error {
+	c := &Options{}
 
-	utils.Init(enableLogs)
-
-	if runID == 0 {
-		return fmt.Errorf("runID cannot be 0")
+	for _, setter := range setters {
+		setter(c)
 	}
-	c.runID = runID
 
-	if dryRun {
+	utils.Init(c.EnableLogs)
+
+	if c.DryRun {
 		utils.Init(true)
-		c.dryRun = true
 	}
 
-	if elasticInfo != nil {
-		if err := setElasticInfo(ctx, c, elasticInfo); err != nil {
+	if c.ElasticInfo != nil {
+		if err := verifyElasticInfo(ctx, c); err != nil {
 			return err
 		}
 	}
 
-	if webexInfo != nil {
-		if err := setWebexInfo(ctx, c, webexInfo); err != nil {
+	if c.WebexInfo != nil {
+		if err := verifyWebexInfo(ctx, c); err != nil {
 			return err
 		}
 	}
 
-	if slackInfo != nil {
-		if err := setSlackInfo(ctx, c, slackInfo); err != nil {
+	if c.SlackInfo != nil {
+		if err := verifySlackInfo(ctx, c); err != nil {
 			return err
 		}
 	}
 
-	if jiraInfo != nil {
-		if err := setJiraInfo(ctx, c, jiraInfo); err != nil {
+	if c.JiraInfo != nil {
+		if err := verifyJiraInfo(ctx, c); err != nil {
 			return err
 		}
 	}
 
 	afterSuiteReport := func(report ginkgoTypes.Report) {
-		if c.elasticInfo != nil {
-			utils.Byf(fmt.Sprintf("Save results to elastic db. Run %d", runID))
-			elastic_helper.StoreResults(&report, c.runID, c.getElasticInfo())
+		if c.ElasticInfo != nil {
+			utils.Byf(fmt.Sprintf("Save results to elastic db. Run %d", c.RunID))
+			elastic_helper.StoreResults(&report, c.RunID, c.getElasticInfo())
 		}
 
 		var openIssues []jira.Issue
-		if c.jiraInfo != nil {
-			utils.Byf(fmt.Sprintf("File jira issue for failed tests. Run %d", runID))
-			_ = jira_helper.FileJiraIssuesForFailedTests(context.TODO(), &report, c.runID, c.getJiraInfo())
+		if c.JiraInfo != nil {
+			utils.Byf(fmt.Sprintf("File jira issue for failed tests. Run %d", c.RunID))
+			_ = jira_helper.FileJiraIssuesForFailedTests(context.TODO(), &report, c.RunID, c.getJiraInfo())
 
 			openIssues, _ = jira_helper.GetOpenE2EJiraIssue(context.TODO(), c.getJiraInfo())
 		}
 
 		msg := prepareMessage(&report, c, openIssues)
 
-		if c.webexInfo != nil {
-			utils.Byf(fmt.Sprintf("Send failed tests notification to webex room %s", c.webexInfo.Room))
+		if c.WebexInfo != nil {
+			utils.Byf(fmt.Sprintf("Send failed tests notification to webex room %s", c.WebexInfo.Room))
 			sendWebexNotification(&report, c, msg)
 		}
 
-		if c.slackInfo != nil {
-			utils.Byf(fmt.Sprintf("Send failed tests notification to slack channel %s", c.slackInfo.Channel))
+		if c.SlackInfo != nil {
+			utils.Byf(fmt.Sprintf("Send failed tests notification to slack channel %s", c.SlackInfo.Channel))
 			sendWebexNotification(&report, c, msg)
 		}
 	}
@@ -142,13 +168,13 @@ func Register(ctx context.Context, runID int64, enableLogs bool, dryRun bool,
 }
 
 // sendWebexNotification send a message for each failed test.
-func sendWebexNotification(report *ginkgoTypes.Report, c *info, msg string) {
+func sendWebexNotification(report *ginkgoTypes.Report, c *Options, msg string) {
 	utils.Byf("Eventually sending Webex notifications")
 
 	webex_helper.SendWebexMessage(c.getWebexInfo(), msg)
 }
 
-func prepareMessage(report *ginkgoTypes.Report, c *info, openIssues []jira.Issue) string {
+func prepareMessage(report *ginkgoTypes.Report, c *Options, openIssues []jira.Issue) string {
 	msg := ""
 	for i := range report.SpecReports {
 		specReport := report.SpecReports[i]
@@ -157,7 +183,7 @@ func prepareMessage(report *ginkgoTypes.Report, c *info, openIssues []jira.Issue
 			if testText == "" {
 				testText = ginkgo_helper.GetSummary(&specReport)
 			}
-			msg += fmt.Sprintf("Test: %q failed in run %d ", testText, c.runID)
+			msg += fmt.Sprintf("Test: %q failed in run %d ", testText, c.RunID)
 			if openIssue := jira_helper.FindExistingIssue(openIssues, &specReport); openIssue != nil {
 				msg += fmt.Sprintf("current jira issue %s", openIssue.Key)
 			}
@@ -168,68 +194,64 @@ func prepareMessage(report *ginkgoTypes.Report, c *info, openIssues []jira.Issue
 	return msg
 }
 
-func (i *info) getWebexInfo() *webex_helper.WebexInfo {
+func (i *Options) getWebexInfo() *webex_helper.WebexInfo {
 	return &webex_helper.WebexInfo{
-		AuthToken: i.webexInfo.AuthToken,
-		Room:      i.webexInfo.Room,
-		DryRun:    i.dryRun,
+		AuthToken: i.WebexInfo.AuthToken,
+		Room:      i.WebexInfo.Room,
+		DryRun:    i.DryRun,
 	}
 }
 
-func (i *info) getSlackInfo() *slack_helper.SlackInfo {
+func (i *Options) getSlackInfo() *slack_helper.SlackInfo {
 	return &slack_helper.SlackInfo{
-		AuthToken: i.slackInfo.AuthToken,
-		Channel:   i.slackInfo.Channel,
-		DryRun:    i.dryRun,
+		AuthToken: i.SlackInfo.AuthToken,
+		Channel:   i.SlackInfo.Channel,
+		DryRun:    i.DryRun,
 	}
 }
 
-func (i *info) getElasticInfo() *elastic_helper.ElasticInfo {
+func (i *Options) getElasticInfo() *elastic_helper.ElasticInfo {
 	return &elastic_helper.ElasticInfo{
-		URL:    i.elasticInfo.URL,
-		Index:  i.elasticInfo.Index,
-		DryRun: i.dryRun,
+		URL:    i.ElasticInfo.URL,
+		Index:  i.ElasticInfo.Index,
+		DryRun: i.DryRun,
 	}
 }
 
-func (i *info) getJiraInfo() *jira_helper.JiraInfo {
+func (i *Options) getJiraInfo() *jira_helper.JiraInfo {
 	return &jira_helper.JiraInfo{
-		BaseURL:   i.jiraInfo.BaseURL,
-		Project:   i.jiraInfo.Project,
-		Board:     i.jiraInfo.Board,
-		Component: i.jiraInfo.Component,
-		Username:  i.jiraInfo.Username,
-		Password:  i.jiraInfo.Password,
-		DryRun:    i.dryRun,
+		BaseURL:   i.JiraInfo.BaseURL,
+		Project:   i.JiraInfo.Project,
+		Board:     i.JiraInfo.Board,
+		Component: i.JiraInfo.Component,
+		Username:  i.JiraInfo.Username,
+		Password:  i.JiraInfo.Password,
+		DryRun:    i.DryRun,
 	}
 }
 
-func setElasticInfo(ctx context.Context, c *info, elasticInfo *ElasticInfo) error {
-	c.elasticInfo = elasticInfo
+func verifyElasticInfo(ctx context.Context, c *Options) error {
 	if err := elastic_helper.VerifyInfo(ctx, c.getElasticInfo()); err != nil {
 		return fmt.Errorf("failed to verify elastic info. Error: %v", err)
 	}
 	return nil
 }
 
-func setWebexInfo(ctx context.Context, c *info, webexInfo *WebexInfo) error {
-	c.webexInfo = webexInfo
+func verifyWebexInfo(ctx context.Context, c *Options) error {
 	if err := webex_helper.VerifyInfo(c.getWebexInfo()); err != nil {
 		return fmt.Errorf("failed to verify webex info. Error: %v", err)
 	}
 	return nil
 }
 
-func setSlackInfo(ctx context.Context, c *info, slackInfo *SlackInfo) error {
-	c.slackInfo = slackInfo
+func verifySlackInfo(ctx context.Context, c *Options) error {
 	if err := slack_helper.VerifyInfo(ctx, c.getSlackInfo()); err != nil {
 		return fmt.Errorf("failed to verify slack info. Error: %v", err)
 	}
 	return nil
 }
 
-func setJiraInfo(ctx context.Context, c *info, jiraInfo *JiraInfo) error {
-	c.jiraInfo = jiraInfo
+func verifyJiraInfo(ctx context.Context, c *Options) error {
 	if err := jira_helper.VerifyInfo(ctx, c.getJiraInfo()); err != nil {
 		return fmt.Errorf("failed to verify jira info. Error: %v", err)
 	}

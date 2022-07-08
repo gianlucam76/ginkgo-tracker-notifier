@@ -60,3 +60,46 @@ func TestLib(t *testing.T) {
 	RunSpecs(t, "Controllers Suite", suiteConfig, reporterConfig)
 }
 ```
+
+## Installing
+
+### dry run
+
+If you want to test info provided are correct, you can invoke ginkgo_helper.Register and set dryRun to true.
+This will:
+- log what results it would store into the (if provided) elastic DB without actually storing anything;
+- log which message it would send to the (if provided) webex room without actually sending any message;
+- log which message it would send to the (if provided) slack channel without actually sending any message;
+- log which issues it would file to the (if provided) Jira project/board without actually filing any bug.
+
+### make ut
+
+Another option is to:
+
+1. prepare a config file containing the necessary info. Here is an example
+```
+    JIRA_BASE_URL: "your jira base url"
+    JIRA_PROJECT: "your jira project"
+    JIRA_BOARD: "your jira board"
+    JIRA_USERNAME: "your jira username"
+    JIRA_PASSWORD: "your jira password"
+
+webex:
+    WEBEX_AUTH_TOKEN: "your webex auth token"
+    WEBEX_ROOM: "your webex room"
+
+slack:
+    SLACK_AUTH_TOKEN: "your slack token"
+    SLACK_CHANNEL: "your slack channel name"
+
+elastic:
+    ELASTIC_URL: "your elastic URL"
+    ELASTIC_INDEX: "your elastic index"
+~                             
+```
+2. export TEST_CONFIG_FILE=<file created at step #1 path>
+3. make ut
+
+This will verify provided info are correct (no jira bug will be filed, no message will be sent to webex/slack, no result will be stored to elastic DB).
+
+

@@ -1,4 +1,4 @@
-module jira_utils/hack/tools
+module ginkgo-tracker-notifier/hack/tools
 
 go 1.17
 

@@ -55,122 +55,112 @@ var _ = Describe("Test verify methods", func() {
 		config = prepareEnvironment()
 	})
 
-	It("SetElasticInfo reports no error when correct info are provided", Label("ELASTIC"), func() {
+	It("VerifyElasticInfo reports no error when correct info are provided", Label("ELASTIC"), func() {
 		Expect(config.Elastic).ToNot(BeEmpty())
-		elasticInfo := process_result.ElasticInfo{
+		c := &process_result.Options{}
+		c.ElasticInfo = &process_result.ElasticInfo{
 			URL:   config.GetElasticVariable(ELASTIC_URL),
 			Index: config.GetElasticVariable(ELASTIC_INDEX),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetElasticInfo(context.TODO(), c, &elasticInfo)).To(BeNil())
+		Expect(process_result.VerifyElasticInfo(context.TODO(), c)).To(BeNil())
 	})
 
-	It("SetElasticInfo reports an error when URL is incorrect", Label("ELASTIC"), func() {
+	It("VerifyElasticInfo reports an error when URL is incorrect", Label("ELASTIC"), func() {
 		Expect(config.Elastic).ToNot(BeEmpty())
 		elastUrl := "issues.elastic.org/"
-		elasticInfo := process_result.ElasticInfo{
+		c := &process_result.Options{}
+		c.ElasticInfo = &process_result.ElasticInfo{
 			URL:   elastUrl,
 			Index: config.GetElasticVariable(ELASTIC_INDEX),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetElasticInfo(context.TODO(), c, &elasticInfo)).ToNot(BeNil())
+		Expect(process_result.VerifyElasticInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetElasticInfo reports an error when index does not exist", Label("ELASTIC"), func() {
+	It("VerifyElasticInfo reports an error when index does not exist", Label("ELASTIC"), func() {
 		Expect(config.Elastic).ToNot(BeEmpty())
 		elastIndex := "1234-abcd"
-		elasticInfo := process_result.ElasticInfo{
+		c := &process_result.Options{}
+		c.ElasticInfo = &process_result.ElasticInfo{
 			URL:   config.GetElasticVariable(ELASTIC_URL),
 			Index: elastIndex,
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetElasticInfo(context.TODO(), c, &elasticInfo)).ToNot(BeNil())
+		Expect(process_result.VerifyElasticInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetSlackInfo reports no error when correct info are provided", Label("SLACK"), func() {
+	It("VerifySlackInfo reports no error when correct info are provided", Label("SLACK"), func() {
 		Expect(config.Slack).ToNot(BeEmpty())
-		slackInfo := process_result.SlackInfo{
+		c := &process_result.Options{}
+		c.SlackInfo = &process_result.SlackInfo{
 			AuthToken: config.GetSlackVariable(SLACK_AUTH_TOKEN),
 			Channel:   config.GetSlackVariable(SLACK_CHANNEL),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).To(BeNil())
+		Expect(process_result.VerifySlackInfo(context.TODO(), c)).To(BeNil())
 	})
 
-	It("SetSlackInfo reports error when wrong token is provided", Label("SLACK"), func() {
+	It("VerifySlackInfo reports error when wrong token is provided", Label("SLACK"), func() {
 		Expect(config.Slack).ToNot(BeEmpty())
 		slackAuthToken := "abc"
-		slackInfo := process_result.SlackInfo{
+		c := &process_result.Options{}
+		c.SlackInfo = &process_result.SlackInfo{
 			AuthToken: slackAuthToken,
 			Channel:   config.GetSlackVariable(SLACK_CHANNEL),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).ToNot(BeNil())
+		Expect(process_result.VerifySlackInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetSlackInfo reports error when wrong channel name is provided", Label("SLACK"), func() {
+	It("VerifySlackInfo reports error when wrong channel name is provided", Label("SLACK"), func() {
 		Expect(config.Slack).ToNot(BeEmpty())
-		slackInfo := process_result.SlackInfo{
+		c := &process_result.Options{}
+		c.SlackInfo = &process_result.SlackInfo{
 			AuthToken: config.GetSlackVariable(SLACK_AUTH_TOKEN),
 			Channel:   "non-existing",
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetSlackInfo(context.TODO(), c, &slackInfo)).ToNot(BeNil())
+		Expect(process_result.VerifySlackInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetWebexInfo reports no error when correct info are provided", Label("WEBEX"), func() {
+	It("VerifyWebexInfo reports no error when correct info are provided", Label("WEBEX"), func() {
 		Expect(config.Webex).ToNot(BeEmpty())
-		webexInfo := process_result.WebexInfo{
+		c := &process_result.Options{}
+		c.WebexInfo = &process_result.WebexInfo{
 			AuthToken: config.GetWebexVariable(WEBEX_AUTH_TOKEN),
 			Room:      config.GetWebexVariable(WEBEX_ROOM),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetWebexInfo(context.TODO(), c, &webexInfo)).To(BeNil())
+		Expect(process_result.VerifyWebexInfo(context.TODO(), c)).To(BeNil())
 	})
 
-	It("SetWebexInfo reports error when auth token is incorrect", Label("WEBEX"), func() {
+	It("VerifyWebexInfo reports error when auth token is incorrect", Label("WEBEX"), func() {
 		Expect(config.Webex).ToNot(BeEmpty())
 		webexAuthToken := "123"
-		webexInfo := process_result.WebexInfo{
+		c := &process_result.Options{}
+		c.WebexInfo = &process_result.WebexInfo{
 			AuthToken: webexAuthToken,
 			Room:      config.GetWebexVariable(WEBEX_ROOM),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetWebexInfo(context.TODO(), c, &webexInfo)).ToNot(BeNil())
+		Expect(process_result.VerifyWebexInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetWebexInfo reports error when room is incorrect", Label("WEBEX"), func() {
+	It("VerifyWebexInfo reports error when room is incorrect", Label("WEBEX"), func() {
 		Expect(config.Webex).ToNot(BeEmpty())
 		webexRoom := "test-1234-abcd"
-		webexInfo := process_result.WebexInfo{
+		c := &process_result.Options{}
+		c.WebexInfo = &process_result.WebexInfo{
 			AuthToken: config.GetWebexVariable(WEBEX_AUTH_TOKEN),
 			Room:      webexRoom,
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetWebexInfo(context.TODO(), c, &webexInfo)).ToNot(BeNil())
+		Expect(process_result.VerifyWebexInfo(context.TODO(), c)).ToNot(BeNil())
 	})
 
-	It("SetJiraInfo reports no error when correct info are provided", Label("JIRA"), func() {
+	It("VerifyJiraInfo reports no error when correct info are provided", Label("JIRA"), func() {
 		Expect(config.Jira).ToNot(BeEmpty())
-		jiraInfo := process_result.JiraInfo{
+		c := &process_result.Options{}
+		c.JiraInfo = &process_result.JiraInfo{
 			BaseURL:  config.GetJiraVariable(JIRA_BASE_URL),
 			Project:  config.GetJiraVariable(JIRA_PROJECT),
 			Board:    config.GetJiraVariable(JIRA_BOARD),
 			Username: config.GetJiraVariable(JIRA_USERNAME),
 			Password: config.GetJiraVariable(JIRA_PASSWORD),
 		}
-
-		c := &process_result.Info{}
-		Expect(process_result.SetJiraInfo(context.TODO(), c, &jiraInfo)).To(BeNil())
+		Expect(process_result.VerifyJiraInfo(context.TODO(), c)).To(BeNil())
 	})
 })
 

@@ -1,18 +1,10 @@
 package process_result
 
 var (
-	SetElasticInfo = setElasticInfo
-	SetWebexInfo   = setWebexInfo
-	SetSlackInfo   = setSlackInfo
-	SetJiraInfo    = setJiraInfo
+	VerifyElasticInfo = verifyElasticInfo
+	VerifyWebexInfo   = verifyWebexInfo
+	VerifySlackInfo   = verifySlackInfo
+	VerifyJiraInfo    = verifyJiraInfo
 
 	PrepareMessage = prepareMessage
 )
-
-type (
-	Info = info
-)
-
-func (i *info) SetRundId(runId int64) {
-	i.runID = runId
-}

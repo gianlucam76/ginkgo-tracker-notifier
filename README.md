@@ -43,17 +43,10 @@ func TestLib(t *testing.T) {
 	}
   
 	Expect(ginkgo_helper.Register(context.TODO(),
-		12345,        // run ID: your CI run id
-		false,        // enableLogs: if disabled no logs will printed.
-		false,        // dryRun: if enables, this package will print all it would do:
-		              // - log what it would store to the provided elastic DB without storing anything;
-  		              // - log what message it would send to the provided webex room, without sending any message;
-			      // - log what message it would send to the provided slack channel, without sending any message;
- 		              // - log what Jira issues it would file, without filing any issue.
-		&elasticInfo, // elastic info: test results will be stored into an elastic DB;
-		&webexInfo,   // webex info: a webex message will be sent for failed tests in this suite;
-		&slackInfo,   // slack info: a slack message will be sent for failed tests in this suite;
-		nil,          // no jira. No Jira issue will be failed for failed tests in this suite;
+		ginkgo_helper.WithRunID(12345),         
+		ginkgo_helper.WithElastic(elasticInfo),
+		ginkgo_helper.WithWebex(webexInfo),
+		ginkgo_helper.WithSlack(slackInfo),
 	)).To(Succeed())
 
 
@@ -65,7 +58,7 @@ func TestLib(t *testing.T) {
 
 ### dry run
 
-If you want to test info provided are correct, you can invoke ginkgo_helper.Register and set dryRun to true.
+If you want to test info provided are correct, you can invoke ginkgo_helper.Register and set dryRun to true (use WithDryRun setter)
 This will:
 - log what results it would store into the (if provided) elastic DB without actually storing anything;
 - log which message it would send to the (if provided) webex room without actually sending any message;

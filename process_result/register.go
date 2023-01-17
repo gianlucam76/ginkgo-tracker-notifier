@@ -159,7 +159,7 @@ func Register(ctx context.Context, setters ...Option) error {
 
 		if c.SlackInfo != nil {
 			utils.Byf(fmt.Sprintf("Send failed tests notification to slack channel %s", c.SlackInfo.Channel))
-			sendWebexNotification(&report, c, msg)
+			sendSlackNotification(&report, c, msg)
 		}
 	}
 
@@ -172,6 +172,13 @@ func sendWebexNotification(report *ginkgoTypes.Report, c *Options, msg string) {
 	utils.Byf("Eventually sending Webex notifications")
 
 	webex_helper.SendWebexMessage(c.getWebexInfo(), msg)
+}
+
+// sendSlackNotification send a message for each failed test.
+func sendSlackNotification(report *ginkgoTypes.Report, c *Options, msg string) {
+	utils.Byf("Eventually sending Slack notifications")
+
+	slack_helper.SendSlackMessage(c.getSlackInfo(), msg)
 }
 
 func prepareMessage(report *ginkgoTypes.Report, c *Options, openIssues []jira.Issue) string {

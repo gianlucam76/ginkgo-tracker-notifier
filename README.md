@@ -17,7 +17,7 @@ You can pick what you need (all or a just a subset of supported features).
 
 ```
 import (
- 	"ginkgo_helper "github.com/gianlucam76/ginkgo-tracker-notifier/process_result"
+ 	ginkgo_helper "github.com/gianlucam76/ginkgo-tracker-notifier/process_result"
  )
 ```
 

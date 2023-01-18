@@ -106,8 +106,6 @@ func Register(ctx context.Context, setters ...Option) error {
 		setter(c)
 	}
 
-	utils.Init(c.EnableLogs)
-
 	if c.DryRun {
 		utils.Init(true)
 	}
@@ -135,6 +133,8 @@ func Register(ctx context.Context, setters ...Option) error {
 			return err
 		}
 	}
+
+	utils.Init(c.EnableLogs)
 
 	afterSuiteReport := func(report ginkgoTypes.Report) {
 		if c.ElasticInfo != nil {

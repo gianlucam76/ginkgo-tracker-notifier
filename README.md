@@ -92,8 +92,10 @@ elastic:
 ~                             
 ```
 2. export TEST_CONFIG_FILE=<file created at step #1 path>
-3. make ut
+3. export FOCUS=WEBEX,JIRA,SLACK,ELASTIC (select a subset if you are testing subset)
+4. make ut
 
 This will verify provided info are correct (no jira bug will be filed, no message will be sent to webex/slack, no result will be stored to elastic DB).
 
+All variables set in the file will be exported as env variable.
 

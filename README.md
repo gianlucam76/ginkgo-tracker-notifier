@@ -42,6 +42,8 @@ func TestLib(t *testing.T) {
 		Index:      "YOUR ELASTIC INDEX",
 	}
   
+        defer GinkgoRecover()
+
 	Expect(ginkgo_helper.Register(context.TODO(),
 		ginkgo_helper.WithRunID(12345),         
 		ginkgo_helper.WithElastic(elasticInfo),
